@@ -6,8 +6,9 @@ import com.google.firebase.FirebaseOptions;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 public class FirebaseConfig {
@@ -15,13 +16,9 @@ public class FirebaseConfig {
     @Bean
     public FirebaseApp initFirebase() throws IOException {
         try {
-            InputStream serviceAccount =
-                    getClass()
-                            .getClassLoader()
-                            .getResourceAsStream("static/firebaseCredentials.json");
-
+            String credentials = System.getenv("FIREBASE_CREDENTIALS");
             FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                    .setCredentials(GoogleCredentials.fromStream(new ByteArrayInputStream(credentials.getBytes(StandardCharsets.UTF_8))))
                     .build();
 
             return FirebaseApp.initializeApp(options);
