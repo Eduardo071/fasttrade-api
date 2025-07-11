@@ -15,6 +15,8 @@ import java.util.concurrent.ExecutionException;
 
 @Repository
 public class FirestoreRepository {
+
+    // === MÉTODO SEM TRANSAÇÃO ===
     public <T> T getDocumentById(String collection, String id, Class<T> clazz) throws ExecutionException, InterruptedException {
         DocumentReference ref = FirestoreClient.getFirestore().collection(collection).document(id);
         DocumentSnapshot snapshot = ref.get().get();
@@ -50,6 +52,7 @@ public class FirestoreRepository {
         return snapshot.exists() ? snapshot.toObject(clazz) : null;
     }
 
+    // === COM TRANSAÇÃO ===
     public <T> T getDocumentById(Transaction transaction, String collection, String id, Class<T> clazz) throws ExecutionException, InterruptedException {
         DocumentReference ref = FirestoreClient.getFirestore().collection(collection).document(id);
         DocumentSnapshot snapshot = transaction.get(ref).get();

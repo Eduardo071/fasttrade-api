@@ -1,20 +1,17 @@
 package com.fasttrade.api.service;
 
 import com.fasttrade.api.constant.CollectionConstants;
-import com.fasttrade.api.exception.FirebaseProcessingException;
 import com.fasttrade.api.model.dto.FcmTokenDTO;
 import com.fasttrade.api.repository.FirestoreRepository;
 import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.ExecutionException;
-
 @Service
 public class NotificationService {
+
     @Autowired
     private FirestoreRepository firestoreRepository;
 
@@ -27,6 +24,7 @@ public class NotificationService {
             );
 
             if (fcmData == null || fcmData.getFcmToken() == null || fcmData.getFcmToken().isBlank()) {
+                System.out.println("⚠️ Token FCM não encontrado para userId: " + userId);
                 return;
             }
 
@@ -39,24 +37,15 @@ public class NotificationService {
                     .build();
 
             String response = FirebaseMessaging.getInstance().send(message);
-            System.out.println("🔔 Notificação enviada com sucesso: " + response);
+            System.out.println("🔔 Notificação enviada com sucesso para " + userId + ": " + response);
 
-        } catch (InterruptedException | ExecutionException | FirebaseMessagingException e) {
-            throw new FirebaseProcessingException("Erro ao enviar notificação FCM.");
+        } catch (Exception e) {
+            System.out.println("❌ Falha ao enviar notificação para " + userId + ": " + e.getMessage());
         }
     }
 
     public void notifyUsers(String fromUserId, String toUserId1, String title, String body) {
-        sendNotificationToUser(
-                fromUserId,
-                title,
-                body
-        );
-
-        sendNotificationToUser(
-                toUserId1,
-                title,
-                body
-        );
+        sendNotificationToUser(fromUserId, title, body);
+        sendNotificationToUser(toUserId1, title, body);
     }
 }

@@ -8,16 +8,12 @@ import com.fasttrade.api.exception.InsufficientBalanceException;
 import com.fasttrade.api.model.dto.*;
 import com.fasttrade.api.repository.FirestoreRepository;
 import com.fasttrade.api.util.CurrencyQuoteUtils;
-import com.google.firebase.cloud.FirestoreClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.ExecutionException;
+import java.util.*;
 
 @Service
 public class TradeIntentionService {
@@ -28,46 +24,60 @@ public class TradeIntentionService {
     @Autowired
     private MatchService matchService;
 
+    @Autowired
+    private NotificationService notificationService;
+
     public TradeIntentionResponseDTO createTradeIntention(TradeIntentionRequestDTO trade, String email) {
         try {
-            return FirestoreClient.getFirestore().runTransaction(transaction -> {
+            List<TradeNotificationData> notificationsToSend = new ArrayList<>();
 
-                WalletResponseDTO wallet = firestoreRepository.getDocumentById(transaction, CollectionConstants.WALLETS, email, WalletResponseDTO.class);
-                if (wallet == null) throw new FirebaseProcessingException("Carteira não encontrada.");
+            // Obtém carteira
+            WalletResponseDTO wallet = firestoreRepository.getDocumentById(CollectionConstants.WALLETS, email, WalletResponseDTO.class);
+            if (wallet == null) throw new FirebaseProcessingException("Carteira não encontrada.");
 
-                BigDecimal balance = wallet.getBalances().getOrDefault(trade.getFromCurrency(), BigDecimal.ZERO);
-                Integer requiredInFromCurrency = CurrencyQuoteUtils.convert(trade.getToCurrency(), trade.getFromCurrency(), trade.getAmount());
-                if (balance.compareTo(BigDecimal.valueOf(requiredInFromCurrency)) < 0) {
-                    throw new InsufficientBalanceException();
-                }
+            // Valida saldo
+            BigDecimal balance = wallet.getBalances().getOrDefault(trade.getFromCurrency(), BigDecimal.ZERO);
+            Integer requiredInFromCurrency = CurrencyQuoteUtils.convert(trade.getToCurrency(), trade.getFromCurrency(), trade.getAmount());
+            if (balance.compareTo(BigDecimal.valueOf(requiredInFromCurrency)) < 0) {
+                throw new InsufficientBalanceException();
+            }
 
-                String tradeId = UUID.randomUUID().toString();
-                Integer amountTo = CurrencyQuoteUtils.convert(trade.getFromCurrency(), trade.getToCurrency(), requiredInFromCurrency);
-                TradeIntentionDTO newTrade = new TradeIntentionDTO(
-                        tradeId,
-                        email,
-                        trade.getFromCurrency(),
-                        trade.getToCurrency(),
-                        requiredInFromCurrency,
-                        amountTo,
-                        TradeStatusEnum.PENDING,
-                        LocalDateTime.now().toString()
-                );
+            // Cria intenção de troca
+            String tradeId = UUID.randomUUID().toString();
+            Integer amountTo = CurrencyQuoteUtils.convert(trade.getFromCurrency(), trade.getToCurrency(), requiredInFromCurrency);
 
-                Optional<TradeIntentionDTO> match = matchService.findAndMatchTrade(transaction, newTrade, email);
+            TradeIntentionDTO newTrade = new TradeIntentionDTO(
+                    tradeId,
+                    email,
+                    trade.getFromCurrency(),
+                    trade.getToCurrency(),
+                    requiredInFromCurrency,
+                    amountTo,
+                    TradeStatusEnum.PENDING,
+                    LocalDateTime.now().toString()
+            );
 
-                firestoreRepository.saveDocument(transaction, CollectionConstants.TRADE_INTENTIONS, tradeId, newTrade, TradeIntentionDTO.class);
+            // Tenta match
+            Optional<TradeIntentionDTO> match = matchService.findAndMatchTradeWithoutTransaction(newTrade, email, notificationsToSend);
 
-                return new TradeIntentionResponseDTO(
-                        newTrade.getId(),
-                        newTrade.getFromCurrency(),
-                        newTrade.getToCurrency(),
-                        newTrade.getAmountFrom(),
-                        newTrade.getAmountTo(),
-                        match.isPresent() ? TradeStatusEnum.MATCHED : TradeStatusEnum.PENDING
-                );
-            }).get();
-        } catch (InterruptedException | ExecutionException e) {
+            // Salva intenção
+            firestoreRepository.saveDocument(CollectionConstants.TRADE_INTENTIONS, tradeId, newTrade, TradeIntentionDTO.class);
+
+            // Envia notificações
+            for (TradeNotificationData n : notificationsToSend) {
+                notificationService.notifyUsers(n.getUserId1(), n.getUserId2(), n.getTitle(), n.getBody());
+            }
+
+            return new TradeIntentionResponseDTO(
+                    newTrade.getId(),
+                    newTrade.getFromCurrency(),
+                    newTrade.getToCurrency(),
+                    newTrade.getAmountFrom(),
+                    newTrade.getAmountTo(),
+                    match.isPresent() ? TradeStatusEnum.MATCHED : TradeStatusEnum.PENDING
+            );
+
+        } catch (Exception e) {
             throw new FirebaseProcessingException("Erro ao processar a intenção de troca.");
         }
     }
