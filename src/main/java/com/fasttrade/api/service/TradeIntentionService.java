@@ -21,8 +21,6 @@ import java.util.concurrent.ExecutionException;
 
 @Service
 public class TradeIntentionService {
-    @Autowired
-    private FirebaseAuthService firebaseAuthService;
 
     @Autowired
     private FirestoreRepository firestoreRepository;
@@ -30,35 +28,35 @@ public class TradeIntentionService {
     @Autowired
     private MatchService matchService;
 
-    public TradeIntentionResponseDTO createTradeIntention(TradeIntentionRequestDTO trade, String token) {
+    public TradeIntentionResponseDTO createTradeIntention(TradeIntentionRequestDTO trade, String email) {
         try {
             return FirestoreClient.getFirestore().runTransaction(transaction -> {
-                String userId = firebaseAuthService.extractTokenUid(token);
 
-                WalletResponseDTO wallet = firestoreRepository.getDocumentById(transaction, CollectionConstants.WALLETS, userId, WalletResponseDTO.class);
+                WalletResponseDTO wallet = firestoreRepository.getDocumentById(transaction, CollectionConstants.WALLETS, email, WalletResponseDTO.class);
                 if (wallet == null) throw new FirebaseProcessingException("Carteira não encontrada.");
 
                 BigDecimal balance = wallet.getBalances().getOrDefault(trade.getFromCurrency(), BigDecimal.ZERO);
-                if (balance.compareTo(BigDecimal.valueOf(trade.getAmount())) < 0) {
+                Integer requiredInFromCurrency = CurrencyQuoteUtils.convert(trade.getToCurrency(), trade.getFromCurrency(), trade.getAmount());
+                if (balance.compareTo(BigDecimal.valueOf(requiredInFromCurrency)) < 0) {
                     throw new InsufficientBalanceException();
                 }
 
                 String tradeId = UUID.randomUUID().toString();
-                Integer amountTo = CurrencyQuoteUtils.convert(trade.getFromCurrency(), trade.getToCurrency(), trade.getAmount());
+                Integer amountTo = CurrencyQuoteUtils.convert(trade.getFromCurrency(), trade.getToCurrency(), requiredInFromCurrency);
                 TradeIntentionDTO newTrade = new TradeIntentionDTO(
                         tradeId,
-                        userId,
+                        email,
                         trade.getFromCurrency(),
                         trade.getToCurrency(),
-                        trade.getAmount(),
+                        requiredInFromCurrency,
                         amountTo,
                         TradeStatusEnum.PENDING,
                         LocalDateTime.now().toString()
                 );
 
-                firestoreRepository.saveDocument(transaction, CollectionConstants.TRADE_INTENTIONS, tradeId, newTrade, TradeIntentionDTO.class);
+                Optional<TradeIntentionDTO> match = matchService.findAndMatchTrade(transaction, newTrade, email);
 
-                Optional<TradeIntentionDTO> match = matchService.findAndMatchTrade(transaction, newTrade, userId);
+                firestoreRepository.saveDocument(transaction, CollectionConstants.TRADE_INTENTIONS, tradeId, newTrade, TradeIntentionDTO.class);
 
                 return new TradeIntentionResponseDTO(
                         newTrade.getId(),
@@ -74,7 +72,7 @@ public class TradeIntentionService {
         }
     }
 
-    public List<ExchangeOptionDTO> getTradeValues(TradeIntentionRequestDTO trade, String token) {
+    public List<ExchangeOptionDTO> getTradeValues(TradeIntentionRequestDTO trade) {
         CurrencyQuoteEnum from = CurrencyQuoteEnum.valueOf(trade.getFromCurrency());
         CurrencyQuoteEnum to = CurrencyQuoteEnum.valueOf(trade.getToCurrency());
 

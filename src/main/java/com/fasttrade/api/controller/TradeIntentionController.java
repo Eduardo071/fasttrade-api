@@ -21,15 +21,13 @@ public class TradeIntentionController {
 
     @PostMapping("/create")
     @Operation(summary = "Criar intenção de troca", description = "Cria uma nova intenção e tenta encontrar um match.")
-    public ResponseEntity<TradeIntentionResponseDTO> createTradeIntention(@RequestHeader("Authorization") String bearerToken, @RequestBody TradeIntentionRequestDTO trade) {
-        String token = bearerToken.replace("Bearer ", "");
-        return ResponseEntity.ok(tradeIntentionService.createTradeIntention(trade, token));
+    public ResponseEntity<TradeIntentionResponseDTO> createTradeIntention(@RequestBody TradeIntentionRequestDTO trade, @RequestHeader("email") String email) {
+        return ResponseEntity.ok(tradeIntentionService.createTradeIntention(trade, email));
     }
 
     @PostMapping("/trade-values")
     @Operation(summary = "Valores de troca possíveis", description = "Retorna opções válidas para a troca entre duas moedas.")
-    public ResponseEntity<List<ExchangeOptionDTO>> getTradeValues(@RequestHeader("Authorization") String bearerToken, @RequestBody TradeIntentionRequestDTO trade) {
-        String token = bearerToken.replace("Bearer ", "");
-        return ResponseEntity.ok(tradeIntentionService.getTradeValues(trade, token));
+    public ResponseEntity<List<ExchangeOptionDTO>> getTradeValues(@RequestBody TradeIntentionRequestDTO trade) {
+        return ResponseEntity.ok(tradeIntentionService.getTradeValues(trade));
     }
 }

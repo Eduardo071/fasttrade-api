@@ -20,31 +20,25 @@ public class UserController {
     @PostMapping("/login")
     @Operation(summary = "Login do usuário", description = "Realiza login e registra o token FCM.")
     public ResponseEntity<UserResponseDTO> login(
-            @RequestHeader("Authorization") String bearerToken,
-            @RequestHeader("fcmToken") String fcmToken
+            @RequestBody UserResponseDTO data
     ) throws Exception {
-        String token = bearerToken.replace("Bearer ", "");
-        return ResponseEntity.ok(userService.authenticateAndGetUser(token, fcmToken));
+        return ResponseEntity.ok(userService.authenticateAndGetUser(data));
     }
 
     @PostMapping("/register")
     @Operation(summary = "Registro de usuário", description = "Registra novo usuário e cria a carteira.")
     public ResponseEntity<UserResponseDTO> register(
-            @RequestHeader("Authorization") String bearerToken,
-            @RequestBody UserAdditionalDataDTO data
+            @RequestBody UserResponseDTO data
     ) throws Exception {
-        String token = bearerToken.replace("Bearer ", "");
-        return ResponseEntity.ok(userService.registerUser(token, data));
+        return ResponseEntity.ok(userService.registerUser(data));
     }
 
     @PutMapping("/data-update")
     @Operation(summary = "Atualizar dados", description = "Atualiza dados do usuário autenticado.")
     public ResponseEntity<UserResponseDTO> updateUser(
-            @RequestHeader("Authorization") String bearerToken,
-            @RequestBody UserAdditionalDataDTO updateUserDTO
+            @RequestBody UserResponseDTO updateUserDTO
     ) throws Exception {
-        String token = bearerToken.replace("Bearer ", "");
-        return ResponseEntity.ok(userService.updateUser(token, updateUserDTO));
+        return ResponseEntity.ok(userService.updateUser(updateUserDTO));
     }
 
 }

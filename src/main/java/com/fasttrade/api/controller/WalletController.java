@@ -21,9 +21,8 @@ public class WalletController {
     @GetMapping("/details")
     @Operation(summary = "Detalhes da carteira", description = "Retorna os saldos em todas as moedas.")
     public ResponseEntity<WalletDetailsDTO> getWalletDetails(
-            @RequestHeader("Authorization") String bearerToken
+            @RequestHeader("email") String email
     ) throws Exception {
-        String token = bearerToken.replace("Bearer ", "");
-        return ResponseEntity.ok(walletService.getWalletDetails(token));
+        return ResponseEntity.ok(walletService.getWalletDetails(email));
     }
 }

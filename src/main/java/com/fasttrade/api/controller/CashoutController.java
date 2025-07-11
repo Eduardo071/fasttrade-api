@@ -19,10 +19,9 @@ public class CashoutController {
     @PostMapping("/register")
     @Operation(summary = "Solicitar saque", description = "Registra um pedido de saque em uma moeda específica.")
     public ResponseEntity<CashoutResponseDTO> postCashout(
-            @RequestHeader("Authorization") String bearerToken,
-            @RequestBody CashoutRequestDTO cashoutRequestDTO
+            @RequestBody CashoutRequestDTO cashoutRequestDTO,
+            @RequestHeader("email") String email
     ) throws Exception {
-        String token = bearerToken.replace("Bearer ", "");
-        return ResponseEntity.ok(cashoutService.postCashout(token, cashoutRequestDTO));
+        return ResponseEntity.ok(cashoutService.postCashout(email, cashoutRequestDTO));
     }
 }

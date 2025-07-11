@@ -6,6 +6,7 @@ import com.fasttrade.api.exception.FirebaseProcessingException;
 import com.fasttrade.api.exception.InvalidBalanceOperationException;
 import com.fasttrade.api.model.dto.WalletResponseDTO;
 import com.fasttrade.api.repository.FirestoreRepository;
+import com.fasttrade.api.util.CurrencyQuoteUtils;
 import com.fasttrade.api.util.MapUtils;
 import com.google.cloud.firestore.Transaction;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,23 +34,50 @@ public class BalanceService {
     }
 
     public Map<String, BigDecimal> getMainBalances(Map<String, BigDecimal> balances, String mainCurrency) {
-        MapUtils mapUtils = new MapUtils();
-        Map.Entry<String, BigDecimal> firstRankedMap = mapUtils.findMapByKey(balances, mainCurrency);
-        Map.Entry<String, BigDecimal> secondRankedMap = mapUtils.getMajorValueInMap(balances);
+        Map<String, BigDecimal> result = new HashMap<>();
 
-        balances.put(firstRankedMap.getKey(), firstRankedMap.getValue());
-        balances.put(secondRankedMap.getKey(), secondRankedMap.getValue());
-        return balances;
+        if (balances.containsKey(mainCurrency)) {
+            result.put(mainCurrency, balances.get(mainCurrency));
+        }
+
+        BigDecimal maxValue = BigDecimal.ZERO;
+        String maxKey = null;
+
+        for (Map.Entry<String, BigDecimal> entry : balances.entrySet()) {
+            if (!entry.getKey().equals(mainCurrency) && entry.getValue().compareTo(maxValue) > 0) {
+                maxValue = entry.getValue();
+                maxKey = entry.getKey();
+            }
+        }
+
+        if (maxKey != null) {
+            result.put(maxKey, maxValue);
+        }
+
+        return result;
     }
+
 
     public Map<String, BigDecimal> calculateTotalBalanceMainCurrency(Map<String, BigDecimal> balances, String mainCurrency) {
-        BigDecimal totalBalance = balances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = BigDecimal.ZERO;
 
-        Map<String, BigDecimal> totalBalanceMainCurrency = new HashMap<>();
-        totalBalanceMainCurrency.put(mainCurrency, totalBalance);
+        for (Map.Entry<String, BigDecimal> entry : balances.entrySet()) {
+            String currency = entry.getKey();
+            BigDecimal amount = entry.getValue();
 
-        return totalBalanceMainCurrency;
+            BigDecimal converted = BigDecimal.valueOf(
+                    CurrencyQuoteUtils.convert(currency, mainCurrency, amount.intValue())
+            );
+
+            total = total.add(converted);
+        }
+
+        Map<String, BigDecimal> result = new HashMap<>();
+        result.put(mainCurrency, total);
+
+        return result;
     }
+
 
     private void updateBalance(Transaction transaction, String targetBalanceKey, Integer operationalValue, String userId, BalanceOperationEnum operation) {
         try {

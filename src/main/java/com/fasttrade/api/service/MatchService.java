@@ -63,7 +63,7 @@ public class MatchService {
             }
 
             return match;
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (Error e) {
             throw new FirebaseProcessingException("Erro ao processar a intenção de troca.");
         }
     }

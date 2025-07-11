@@ -5,7 +5,6 @@ import com.fasttrade.api.exception.FirebaseProcessingException;
 import com.fasttrade.api.exception.UserAlreadyExistsException;
 import com.fasttrade.api.exception.UserNotFoundException;
 import com.fasttrade.api.model.dto.FcmTokenDTO;
-import com.fasttrade.api.model.dto.UserAdditionalDataDTO;
 import com.fasttrade.api.model.dto.UserResponseDTO;
 import com.fasttrade.api.repository.FirestoreRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,70 +21,71 @@ public class UserService {
     private FirestoreRepository firestoreRepository;
 
     @Autowired
-    private FirebaseAuthService firebaseAuthService;
-
-    @Autowired
     private WalletService walletService;
 
     private static final String COLLECTION_NAME = CollectionConstants.USERS;
 
-    public UserResponseDTO authenticateAndGetUser(String token, String fcmToken) {
-        String uid = firebaseAuthService.extractTokenUid(token);
-        UserResponseDTO user = getUserByUid(uid);
+    public UserResponseDTO authenticateAndGetUser(UserResponseDTO data) {
+        try {
+            UserResponseDTO user = getUserByEmail(data.getEmail());
 
-        saveFcmToken(user.getUid(), user.getFcmToken());
+            if (!user.getPassword().equals(data.getPassword())) {
+                throw new IllegalArgumentException("Senha inválida");
+            }
 
-        return user;
+            saveFcmToken(user.getEmail(), data.getFcmToken());
+
+            return user;
+        } catch (UserNotFoundException e) {
+            throw new UserNotFoundException();
+        }
     }
 
-    public UserResponseDTO registerUser(String token, UserAdditionalDataDTO data) {
+    public UserResponseDTO registerUser(UserResponseDTO data) {
         try {
-            String uid = firebaseAuthService.extractTokenUid(token);
-            String email = firebaseAuthService.extractTokenEmail(token);
 
-            UserResponseDTO existentUser = getUserByUid(uid);
+            UserResponseDTO existentUser = findUserIfExists(data.getEmail());
 
             if (existentUser != null) {
                 throw new UserAlreadyExistsException();
             }
 
             UserResponseDTO newUser = new UserResponseDTO();
-            newUser.setUid(uid);
-            newUser.setEmail(email);
+            newUser.setEmail(data.getEmail());
+            newUser.setPassword(data.getPassword());
             newUser.setFcmToken(data.getFcmToken());
             newUser.setFullName(data.getFullName());
             newUser.setMainCurrency(data.getMainCurrency());
             newUser.setCountryId(data.getCountryId());
             newUser.setCreatedAt(LocalDateTime.now().toString());
 
-            walletService.createUserWallet(uid);
-            saveFcmToken(newUser.getUid(), newUser.getFcmToken());
-            return firestoreRepository.saveDocument(COLLECTION_NAME, uid, newUser, UserResponseDTO.class);
+            walletService.createUserWallet(data.getEmail());
+            saveFcmToken(newUser.getEmail(), newUser.getFcmToken());
+            return firestoreRepository.saveDocument(COLLECTION_NAME, data.getEmail(), newUser, UserResponseDTO.class);
         } catch (InterruptedException | ExecutionException e) {
             throw new FirebaseProcessingException("Erro ao cadastrar o usuário no Firestore.");
         }
     }
 
-    public UserResponseDTO updateUser(String token, UserAdditionalDataDTO data) {
+    public UserResponseDTO updateUser(UserResponseDTO data) {
         try {
-            String uid = firebaseAuthService.extractTokenUid(token);
-            UserResponseDTO existentUser = getUserByUid(uid);
+            UserResponseDTO existentUser = getUserByEmail(data.getEmail());
 
             Map<String, Object> updates = new HashMap<>();
             updates.put("fullName", data.getFullName());
             updates.put("mainCurrency", data.getMainCurrency());
             updates.put("countryId", data.getCountryId());
 
-            saveFcmToken(existentUser.getUid(), data.getFcmToken());
-            return firestoreRepository.updateDocument(COLLECTION_NAME, uid, updates, UserResponseDTO.class);
+            saveFcmToken(existentUser.getEmail(), data.getFcmToken());
+            return firestoreRepository.updateDocument(COLLECTION_NAME, existentUser.getEmail(), updates, UserResponseDTO.class);
         } catch (InterruptedException | ExecutionException e) {
             throw new FirebaseProcessingException("Erro ao atualizar o usuário no Firestore.");
         }
     }
 
-    public UserResponseDTO getUserByUid(String uid) {
+    public UserResponseDTO getUserByEmail(String email) {
         try {
-            UserResponseDTO user = firestoreRepository.getDocumentById(COLLECTION_NAME, uid, UserResponseDTO.class);
+            UserResponseDTO user = firestoreRepository.getDocumentById(COLLECTION_NAME, email, UserResponseDTO.class);
 
             if (user == null) {
                 throw new UserNotFoundException();
@@ -115,6 +115,14 @@ public class UserService {
             );
         } catch (InterruptedException | ExecutionException e) {
             throw new FirebaseProcessingException("Erro ao salvar o token FCM.");
+        }
+    }
+
+    private UserResponseDTO findUserIfExists(String email) {
+        try {
+            return firestoreRepository.getDocumentById(COLLECTION_NAME, email, UserResponseDTO.class);
+        } catch (InterruptedException | ExecutionException e) {
+            throw new FirebaseProcessingException("Erro ao buscar o usuário no Firestore.");
         }
     }
 }

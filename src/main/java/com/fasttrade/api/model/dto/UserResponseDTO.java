@@ -9,8 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class UserResponseDTO extends UserAdditionalDataDTO {
-    @JsonIgnore
-    private String uid;
     private String email;
+    private String password;
     private String createdAt;
 }

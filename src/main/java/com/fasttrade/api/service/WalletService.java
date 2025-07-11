@@ -28,16 +28,12 @@ public class WalletService {
     @Autowired
     private FirestoreRepository firestoreRepository;
 
-    @Autowired
-    private FirebaseAuthService firebaseAuthService;
-
     private static final String COLLECTION_NAME = CollectionConstants.WALLETS;
 
-    public WalletDetailsDTO getWalletDetails(String token) {
+    public WalletDetailsDTO getWalletDetails(String email) {
         try {
-            String uid = firebaseAuthService.extractTokenUid(token);
-            WalletResponseDTO walletResponseDTO = firestoreRepository.getDocumentById(COLLECTION_NAME, uid, WalletResponseDTO.class);
-            UserResponseDTO user = userService.getUserByUid(uid);
+            WalletResponseDTO walletResponseDTO = firestoreRepository.getDocumentById(COLLECTION_NAME, email, WalletResponseDTO.class);
+            UserResponseDTO user = userService.getUserByEmail(email);
 
             return new WalletDetailsDTO(
                     walletResponseDTO,

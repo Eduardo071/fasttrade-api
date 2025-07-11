@@ -56,20 +56,14 @@ public class FirestoreRepository {
         return snapshot.exists() ? snapshot.toObject(clazz) : null;
     }
 
-    public <T> T saveDocument(Transaction transaction, String collection, String id, T data, Class<T> clazz) throws ExecutionException, InterruptedException {
+    public <T> void saveDocument(Transaction transaction, String collection, String id, T data, Class<T> clazz) throws ExecutionException, InterruptedException {
         DocumentReference ref = FirestoreClient.getFirestore().collection(collection).document(id);
         transaction.set(ref, data);
-        DocumentSnapshot snapshot = transaction.get(ref).get();
-        return snapshot.exists() ? snapshot.toObject(clazz) : null;
     }
 
-    public <T> void updateDocument(Transaction transaction, String collection, String id, Map<String, Object> updates, Class<T> clazz) throws ExecutionException, InterruptedException {
+    public <T> void updateDocument(Transaction transaction, String collection, String id, Map<String, Object> updates, Class<T> clazz) {
         DocumentReference ref = FirestoreClient.getFirestore().collection(collection).document(id);
         transaction.update(ref, updates);
-        DocumentSnapshot snapshot = transaction.get(ref).get();
-        if (snapshot.exists()) {
-            snapshot.toObject(clazz);
-        }
     }
 
     public List<TradeIntentionDTO> queryMatchingTrade(String fromCurrency, String toCurrency, Integer amount) throws ExecutionException, InterruptedException {
@@ -78,7 +72,7 @@ public class FirestoreRepository {
         ApiFuture<QuerySnapshot> future = db.collection(CollectionConstants.TRADE_INTENTIONS)
                 .whereEqualTo("fromCurrency", toCurrency)
                 .whereEqualTo("toCurrency", fromCurrency)
-                .whereEqualTo("amount", amount)
+                .whereEqualTo("amountTo", amount)
                 .whereEqualTo("status", TradeStatusEnum.PENDING.name())
                 .get();
 

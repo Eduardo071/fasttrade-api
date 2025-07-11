@@ -12,6 +12,5 @@ public class UserAdditionalDataDTO {
     private String fullName;
     private String mainCurrency;
     private String countryId;
-    @JsonIgnore
     private String fcmToken;
 }
